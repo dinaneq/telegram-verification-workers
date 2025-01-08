@@ -1,179 +1,156 @@
-import { MatchType, TelegramRouter, UpdateType } from 'telegram-router';
 import type * as Telegram from 'telegram-bot-api-types';
 import type { APIClient } from './api';
-import type { ENV } from './types';
+import { TelegramRouter } from 'telegram-router';
 
-const welcome = 'Press any number to append it to the message.';
-const keyboard: Telegram.InlineKeyboardButton[][] = [
-    [
-        { text: '1', callback_data: 'num:1' },
-        { text: '2', callback_data: 'num:2' },
-        { text: '3', callback_data: 'num:3' },
-        { text: '+', callback_data: 'num:+' },
-    ],
-    [
-        { text: '4', callback_data: 'num:4' },
-        { text: '5', callback_data: 'num:5' },
-        { text: '6', callback_data: 'num:6' },
-        { text: '-', callback_data: 'num:-' },
-    ],
-    [
-        { text: '7', callback_data: 'num:7' },
-        { text: '8', callback_data: 'num:8' },
-        { text: '9', callback_data: 'num:9' },
-        { text: '*', callback_data: 'num:*' },
-    ],
-    [
-        { text: '⇤', callback_data: 'act:del' },
-        { text: '0', callback_data: 'num:0' },
-        { text: '=', callback_data: 'act:sum' },
-        { text: '/', callback_data: 'num:/' },
-    ],
-];
-
-function calculateExpression(expression: string): number {
-    expression = expression.replace(/\s/g, '');
-
-    const numbers = expression.split(/[-+*/]/).map(Number);
-    const operators = expression.replace(/[0-9.]/g, '').split('');
-
-    for (let i = 0; i < operators.length; i++) {
-        if (operators[i] === '*' || operators[i] === '/') {
-            if (operators[i] === '*') {
-                numbers[i] *= numbers[i + 1];
-            } else {
-                numbers[i] /= numbers[i + 1];
-            }
-            numbers.splice(i + 1, 1);
-            operators.splice(i, 1);
-            i--;
-        }
-    }
-
-    let result = numbers[0];
-    for (let i = 0; i < operators.length; i++) {
-        if (operators[i] === '+') {
-            result += numbers[i + 1];
-        } else if (operators[i] === '-') {
-            result -= numbers[i + 1];
-        }
-    }
-
-    return result;
-}
-
-function handleNumInput(update: Telegram.Update, client: APIClient): Promise<Response> {
-    const num = update.callback_query.data.slice(4);
-    let text = '';
-    if ('text' in update.callback_query.message) {
-        if (update.callback_query.message.text === welcome) {
-            text = num;
-        } else if (num.match(/[-+*/]/) && update.callback_query.message.text?.slice(-1)?.match(/[-+*/]/)) {
-            text = update.callback_query.message.text.slice(0, -1) + num;
-        } else {
-            text = update.callback_query.message.text + num;
-        }
-    }
-    return client.editMessageText({
-        chat_id: update.callback_query.message.chat.id,
-        message_id: update.callback_query.message.message_id,
-        text,
-        reply_markup: {
-            inline_keyboard: keyboard,
-        },
-    });
-}
-
-function handleDelAction(update: Telegram.Update, client: APIClient): Promise<Response> {
-    let text = '';
-    if ('text' in update.callback_query.message) {
-        if (update.callback_query.message.text === welcome) {
-            text = '';
-        } else if (update.callback_query.message.text) {
-            text = update.callback_query.message.text?.slice(0, -1) || '';
-        }
-    }
-    if (text === '') {
-        text = welcome;
-    }
-    return client.editMessageText({
-        chat_id: update.callback_query.message.chat.id,
-        message_id: update.callback_query.message.message_id,
-        text,
-        reply_markup: {
-            inline_keyboard: keyboard,
-        },
-    });
-}
-
-function handleSumAction(update: Telegram.Update, client: APIClient): Promise<Response> {
-    let text = '';
-    try {
-        if ('text' in update.callback_query.message) {
-            if (update.callback_query.message.text) {
-                const res = calculateExpression(update.callback_query.message.text).toFixed();
-                if (res === 'NaN' || res === 'Infinity') {
-                    throw new Error('Invalid expression');
-                }
-                text = res.toString();
-            }
-        }
-    } catch (e) {
-        return client.editMessageText({
-            chat_id: update.callback_query.message.chat.id,
-            message_id: update.callback_query.message.message_id,
-            text: `Invalid expression: ${(e as Error).message}`,
-            reply_markup: null,
-        });
-    }
-    return client.editMessageText({
-        chat_id: update.callback_query.message.chat.id,
-        message_id: update.callback_query.message.message_id,
-        text,
-        reply_markup: {
-            inline_keyboard: keyboard,
-        },
-    });
-}
-
-function handleStartCommand(update: Telegram.Update, client: APIClient): Promise<Response> {
-    return client.sendMessage({
-        chat_id: update.message.chat.id,
-        text: welcome,
-        reply_markup: {
-            inline_keyboard: keyboard,
-        },
-    });
-}
-
-function handleAdminCommand(update: Telegram.Update, client: APIClient, env: ENV): Promise<Response> {
-    if (env.ADMIN_CHAT_ID?.split(',').includes(update.message.chat.id.toString())) {
-        return client.sendMessage({
-            chat_id: update.message.chat.id,
-            text: 'Hello, Admin!',
-        });
-    }
-    return client.sendMessage({
-        chat_id: update.message.chat.id,
-        text: 'You are not an admin!',
-    });
-}
-
-export function createBotServer(): TelegramRouter<Response> {
+export function createBotServer(client: APIClient): TelegramRouter<Response> {
     const bot = new TelegramRouter<Response>();
     bot.with((update) => {
         console.log(JSON.stringify(update));
     });
 
-    bot.handleWith('num:', UpdateType.CallbackQuery, MatchType.Prefix, handleNumInput);
-    bot.handleWith('act:del', UpdateType.CallbackQuery, MatchType.Exact, handleDelAction);
-    bot.handleWith('act:sum', UpdateType.CallbackQuery, MatchType.Exact, handleSumAction);
-    bot.handleWith('/start', UpdateType.Message, MatchType.Exact, handleStartCommand);
-    bot.handleWith('/admin', UpdateType.Message, MatchType.Exact, handleAdminCommand);
+    bot.handle((u: Telegram.Update): boolean => {
+        const length = u.message?.new_chat_members?.length;
+        return length && length > 0;
+    }, async (u: Telegram.Update): Promise<Response> => {
+        const chatId = u.message?.chat.id;
+        if (chatId) {
+            for (const member of u.message?.new_chat_members || []) {
+                await restrictUser(client, chatId, member.id);
+                const { question, buttons } = generateQuestion(member);
+                await client.sendMessage({
+                    chat_id: chatId,
+                    text: question,
+                    reply_parameters: {
+                        message_id: u.message.message_id,
+                        chat_id: chatId,
+                        allow_sending_without_reply: true,
+                    },
+                    reply_markup: {
+                        inline_keyboard: [buttons],
+                    },
+                });
+            }
+        }
+        return new Response('success', { status: 200 });
+    });
 
-    bot.handle(() => true, async (u: Telegram.Update): Promise<Response> => {
-        console.warn('No handler found for', JSON.stringify(u));
-        return new Response('No handler', { status: 200 });
+    bot.handle((u: Telegram.Update): boolean => {
+        return u.callback_query !== undefined;
+    }, async (u: Telegram.Update): Promise<Response> => {
+        const callback_query = u.callback_query.data;
+        if (callback_query) {
+            const [userId] = callback_query.split(':');
+            if (userId === u.callback_query.from.id.toString()) {
+                if (isCorrectAnswer(callback_query)) {
+                    await client.editMessageText({
+                        chat_id: u.callback_query.message.chat.id,
+                        message_id: u.callback_query.message.message_id,
+                        text: `Correct! Well done, ${u.callback_query.from.first_name} ${u.callback_query.from.last_name}!`,
+                    });
+                    await allowUserSendMessage(client, u.callback_query.message.chat.id, u.callback_query.from.id);
+                } else {
+                    const { question, buttons } = generateQuestion(u.callback_query.from);
+                    await client.editMessageText({
+                        chat_id: u.callback_query.message.chat.id,
+                        message_id: u.callback_query.message.message_id,
+                        text: question,
+                        reply_markup: {
+                            inline_keyboard: [buttons],
+                        },
+                    });
+										await client.answerCallbackQuery({
+											callback_query_id: u.callback_query.id,
+											text: 'Wrong answer! Try again!',
+										});
+                }
+            }
+        }
+        return new Response('success', { status: 200 });
     });
     return bot;
+}
+
+function restrictUser(client: APIClient, chatId: number, userId: number): Promise<Response> {
+    return client.restrictChatMember({
+        chat_id: chatId,
+        user_id: userId,
+        permissions: {
+            can_send_messages: false,
+            can_send_audios: false,
+            can_send_documents: false,
+            can_send_photos: false,
+            can_send_videos: false,
+            can_send_video_notes: false,
+            can_send_voice_notes: false,
+            can_send_polls: false,
+            can_send_other_messages: false,
+            can_add_web_page_previews: false,
+            can_change_info: false,
+            can_invite_users: false,
+            can_pin_messages: false,
+            can_manage_topics: false,
+        },
+    });
+}
+
+function allowUserSendMessage(client: APIClient, chatId: number, userId: number): Promise<Response> {
+    return client.restrictChatMember({
+        chat_id: chatId,
+        user_id: userId,
+        permissions: {
+            can_send_messages: true,
+            can_send_audios: true,
+            can_send_documents: true,
+            can_send_photos: true,
+            can_send_videos: true,
+            can_send_video_notes: true,
+            can_send_voice_notes: true,
+            can_send_polls: true,
+            can_send_other_messages: true,
+        },
+    });
+}
+
+type QuestionOperator = `+` | `-` | `*`;
+
+function generateOperation(): { operator: QuestionOperator; operands: [number, number] } {
+    const operands = [
+        Math.floor(Math.random() * 100) + 1,
+        Math.floor(Math.random() * 100) + 1,
+    ] as [number, number];
+    const operator = ['+', '-', '*'][Math.floor(Math.random() * 3)] as QuestionOperator;
+    return { operator, operands };
+}
+
+function calculateOperation(operator: QuestionOperator, operands: [number, number]): number {
+    const [a, b] = operands;
+    switch (operator) {
+        case '+':
+            return a + b;
+        case '-':
+            return a - b;
+        case '*':
+            return a * b;
+    }
+}
+
+function isCorrectAnswer(callback_data: string): boolean {
+    const [_, a, operator, b, answer] = callback_data.split(':');
+    return calculateOperation(operator as QuestionOperator, [Number.parseInt(a), Number.parseInt(b)]) === Number.parseInt(answer);
+}
+
+function generateQuestion(user: Telegram.User): { question: string; buttons: Telegram.InlineKeyboardButton[] } {
+    const { operator, operands } = generateOperation();
+    const answer = calculateOperation(operator, operands);
+    const question = `${user.first_name} ${user.last_name}, what is ${operands[0]} ${operator} ${operands[1]}?`;
+    const buttons: Telegram.InlineKeyboardButton[] = [];
+    const randOffset = Math.floor(Math.random() * 10) + 1;
+    const offsets = [0, randOffset, randOffset - 1, randOffset + 1].sort(() => Math.random() - 0.5);
+    for (const offset of offsets) {
+        buttons.push({
+            text: `${answer + offset}`,
+            callback_data: `${user.id}:${operands[0]}:${operator}:${operands[1]}:${answer + offset}`,
+        });
+    }
+    return { question, buttons };
 }

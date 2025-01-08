@@ -1,9 +1,9 @@
-import { AutoRouter } from 'itty-router';
-import type * as Telegram from 'telegram-bot-api-types';
 import type { AutoRouterType } from 'itty-router/types';
+import type * as Telegram from 'telegram-bot-api-types';
+import type { ENV } from './types';
+import { AutoRouter } from 'itty-router';
 import { createAPIClient } from './api';
 import { createBotServer } from './bot';
-import type { ENV } from './types';
 
 async function handleInit(req: Request, env: ENV): Promise<Response> {
     const client = createAPIClient(env.TELEGRAM_BOT_TOKEN);
@@ -24,8 +24,8 @@ async function handleWebhook(req: Request & { token: string }, env: ENV): Promis
         }
         const update = await req.json() as Telegram.Update;
         const client = createAPIClient(req.token);
-        const bot = createBotServer();
-        return bot.fetch(update, client, env);
+        const bot = createBotServer(client);
+        return bot.fetch(update);
     } catch (e) {
         console.error((e as Error).message);
         console.error((e as Error).stack);
