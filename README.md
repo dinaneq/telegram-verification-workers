@@ -1,5 +1,7 @@
 # telegram-verification-workers
 
+![](preview.jpg)
+
 **telegram-verification-workers** is a telegram bot worker that helps you to verify the user's join request in the telegram **supergroup**.
 
 
