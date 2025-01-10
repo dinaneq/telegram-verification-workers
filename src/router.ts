@@ -9,11 +9,6 @@ async function handleInit(req: Request, env: ENV): Promise<Response> {
     const client = createAPIClient(env.TELEGRAM_BOT_TOKEN);
     const url = new URL(req.url);
     const webhook = `https://${url.hostname}/telegram/${env.TELEGRAM_BOT_TOKEN}/webhook`;
-    await client.setMyCommands({
-        commands: [
-            { command: 'start', description: 'Start the bot' },
-        ],
-    });
     return client.setWebhook({ url: webhook });
 }
 

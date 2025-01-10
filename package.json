@@ -1,12 +1,12 @@
 {
-	"name": "telegram-bot-workers-template",
+	"name": "telegram-verification-workers",
 	"version": "0.0.0",
 	"type": "module",
 	"scripts": {
 		"deploy": "wrangler deploy -c wrangler-prod.toml",
 		"dev": "wrangler dev -c wrangler-prod.toml",
 		"start": "wrangler dev  -c wrangler-prod.toml",
-		"test": "tsx test/index.ts",
+		"test": "tsx src/local.ts",
 		"lint": "eslint --fix src test"
 	},
 	"devDependencies": {
@@ -17,7 +17,8 @@
 		"telegram-bot-api-types": "^7.9.12",
 		"tsx": "^4.19.0",
 		"typescript": "^5.7.2",
-		"wrangler": "^3.60.3"
+		"wrangler": "^3.60.3",
+		"undici": "^7.1.0"
 	},
 	"dependencies": {
 		"itty-router": "^5.0.18",

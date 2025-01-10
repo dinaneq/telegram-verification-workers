@@ -3,7 +3,6 @@ import type * as Telegram from 'telegram-bot-api-types';
 class APIClientBase {
     readonly token: string;
     readonly baseURL: string = `https://api.telegram.org`;
-
     constructor(token: string, baseURL?: string) {
         this.token = token;
         if (baseURL) {
