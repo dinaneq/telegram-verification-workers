@@ -1,8 +1,8 @@
 import type * as Telegram from 'telegram-bot-api-types';
 import type { APIClient } from './api';
-import { TelegramRouter } from 'telegram-router';
+import { MatchType, TelegramRouter } from 'telegram-router';
 
-function renderUsername(user: Telegram.User): { parse_mode?: Telegram.ParseMode, text: string } {
+function renderUsername(user: Telegram.User): string {
     let name = '';
     if (user.first_name) {
         name += user.first_name;
@@ -12,20 +12,8 @@ function renderUsername(user: Telegram.User): { parse_mode?: Telegram.ParseMode,
     }
     if (user.username) {
         name += ` (@${user.username})`;
-				return { text: name };
-    } else {
-			return { parse_mode: 'Markdown', text: `[${escapeMarkdown(name)}](tg://user?id=${user.id})` };
-		}
-}
-
-function escapeMarkdown(text: string): string {
-	const escapeChars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
-	let escapedText = text;
-	escapeChars.forEach(char => {
-		const regex = new RegExp(`\\${char}`, 'g');
-		escapedText = escapedText.replace(regex, `\\${char}`);
-	});
-	return escapedText;
+    }
+    return name;
 }
 
 async function handleNewChatMember(u: Telegram.Update, client: APIClient) {
@@ -34,11 +22,10 @@ async function handleNewChatMember(u: Telegram.Update, client: APIClient) {
         return;
     }
     for (const member of u.message?.new_chat_members || []) {
-        const { parse_mode, question, buttons } = generateQuestion(member);
+        const { question, buttons } = generateQuestion(member);
         await client.sendMessage({
             chat_id: chatId,
             text: question,
-						parse_mode,
             reply_parameters: {
                 message_id: u.message.message_id,
                 chat_id: chatId,
@@ -49,33 +36,35 @@ async function handleNewChatMember(u: Telegram.Update, client: APIClient) {
             },
         });
         const response = await banUser(client, chatId, member.id);
-				console.log(await response.json());
+        console.log(await response.json());
     }
 }
 
-async function handleCallBackQuery(u: Telegram.Update, client: APIClient) {
-    const callback_query = u.callback_query.data;
-    if (!callback_query) {
-        return;
-    }
-    const [userId] = callback_query.split(':');
+async function handleAnswerCallBackQuery(u: Telegram.Update, client: APIClient) {
+    const [_, userId] = u.callback_query.data.split(':');
     if (userId === u.callback_query.from.id.toString()) {
-        if (isCorrectAnswer(callback_query)) {
-						const { parse_mode, text } = renderUsername(u.callback_query.from);
+        if (isCorrectAnswer(u.callback_query.data)) {
+            const name = renderUsername(u.callback_query.from);
             await client.editMessageText({
                 chat_id: u.callback_query.message.chat.id,
                 message_id: u.callback_query.message.message_id,
-							  parse_mode,
-                text: `Congratulations ${text}! You have been unbanned!`,
+                text: `Congratulations ${name}! You have been unbanned!`,
+                reply_markup: {
+                    inline_keyboard: [
+                        [{
+                            text: 'OK!',
+                            callback_data: `del:${u.callback_query.from.id}`,
+                        }],
+                    ],
+                },
             });
             await unbanUser(client, u.callback_query.message.chat.id, u.callback_query.from.id);
         } else {
-            const { parse_mode, question, buttons } = generateQuestion(u.callback_query.from);
+            const { question, buttons } = generateQuestion(u.callback_query.from);
             await client.editMessageText({
                 chat_id: u.callback_query.message.chat.id,
                 message_id: u.callback_query.message.message_id,
                 text: question,
-								parse_mode,
                 reply_markup: {
                     inline_keyboard: [buttons],
                 },
@@ -85,6 +74,16 @@ async function handleCallBackQuery(u: Telegram.Update, client: APIClient) {
                 text: 'Wrong answer! Try again!',
             });
         }
+    }
+}
+
+async function handleDeleteSuccessMessage(u: Telegram.Update, client: APIClient) {
+    const [_, id] = u.callback_query.data.split(':');
+    if (id === u.callback_query.from.id.toString()) {
+        await client.deleteMessage({
+            chat_id: u.callback_query.message.chat.id,
+            message_id: u.callback_query.message.message_id,
+        });
     }
 }
 
@@ -101,11 +100,12 @@ export function createBotServer(client: APIClient): TelegramRouter<Response> {
         await handleNewChatMember(u, client);
         return new Response('success', { status: 200 });
     });
-
-    bot.handle((u: Telegram.Update): boolean => {
-        return u.callback_query !== undefined;
-    }, async (u: Telegram.Update): Promise<Response> => {
-        await handleCallBackQuery(u, client);
+    bot.handleCallback('an:', MatchType.Prefix, async (u: Telegram.Update): Promise<Response> => {
+        await handleAnswerCallBackQuery(u, client);
+        return new Response('success', { status: 200 });
+    });
+    bot.handleCallback('del:', MatchType.Prefix, async (u: Telegram.Update): Promise<Response> => {
+        await handleDeleteSuccessMessage(u, client);
         return new Response('success', { status: 200 });
     });
     bot.handle(() => true, async () => new Response('success', { status: 200 }));
@@ -174,24 +174,25 @@ function calculateOperation(operator: QuestionOperator, operands: [number, numbe
 }
 
 function isCorrectAnswer(callback_data: string): boolean {
-    const [_, a, operator, b, answer] = callback_data.split(':');
+    const [_, __, a, operator, b, answer] = callback_data.split(':');
     return calculateOperation(operator as QuestionOperator, [Number.parseInt(a), Number.parseInt(b)]) === Number.parseInt(answer);
 }
 
-function generateQuestion(user: Telegram.User): {parse_mode?: Telegram.ParseMode,  question: string; buttons: Telegram.InlineKeyboardButton[] } {
+function generateQuestion(user: Telegram.User): { parse_mode?: Telegram.ParseMode; question: string; buttons: Telegram.InlineKeyboardButton[] } {
     const { operator, operands } = generateOperation();
     const answer = calculateOperation(operator, operands);
-		const { parse_mode, text } = renderUsername(user);
-		const question = `Hello ${text}\nAnswer the following question to be unbanned\n${operands[0]} ${operator} ${operands[1]} = ?`;
+    const question = `Answer the following question to be unbanned\n${operands[0]} ${operator} ${operands[1]} = ?`;
     const buttons: Telegram.InlineKeyboardButton[] = [];
-    let randOffset = Math.floor(Math.random() * 10) + 1;
-    randOffset = randOffset === 0 ? 1 : randOffset;
-    const offsets = [0, randOffset, randOffset - 1, randOffset + 1].sort(() => Math.random() - 0.5);
+    let offsets = [1,2,3,4,5,-1,-2,-3,-4,-5]
+			.sort(() => Math.random() - 0.5)
+			.slice(0, 3);
+		offsets.push(0);
+		offsets = offsets.sort(() => Math.random() - 0.5);
     for (const offset of offsets) {
         buttons.push({
             text: `${answer + offset}`,
-            callback_data: `${user.id}:${operands[0]}:${operator}:${operands[1]}:${answer + offset}`,
+            callback_data: `an:${user.id}:${operands[0]}:${operator}:${operands[1]}:${answer + offset}`,
         });
     }
-    return { parse_mode, question, buttons };
+    return { question, buttons };
 }

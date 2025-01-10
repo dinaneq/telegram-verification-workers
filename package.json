@@ -7,7 +7,7 @@
 		"dev": "wrangler dev -c wrangler-prod.toml",
 		"start": "wrangler dev  -c wrangler-prod.toml",
 		"test": "tsx src/local.ts",
-		"lint": "eslint --fix src test"
+		"lint": "eslint --fix src"
 	},
 	"devDependencies": {
 		"@antfu/eslint-config": "^3.13.0",
