@@ -9,7 +9,7 @@
 
 - [**telegram-router**](https://github.com/TBXark/telegram-router): A simple javascript library that helps you to route messages from telegram bot to your application.
 - [**telegram-bot-api-types**](https://github.com/TBXark/telegram-bot-api-types): Telegram Bot API SDK compiled size is 0KB that only includes type definition files and jsdoc files.
-- [**`telegram-bot-workers-template`**](https://github.com/TBXark/telegram-bot-workers-template): A simple template for creating telegram bot workers.
+- [**telegram-bot-workers-template**](https://github.com/TBXark/telegram-bot-workers-template): A simple template for creating telegram bot workers.
 - [**cloudflare-worker-adapter**](https://github.com/TBXark/cloudflare-worker-adapter): Run your script without Cloudflare Workers.
 
 
