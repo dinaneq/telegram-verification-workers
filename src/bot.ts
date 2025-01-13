@@ -26,6 +26,7 @@ async function handleNewChatMember(u: Telegram.Update, client: APIClient) {
         await client.sendMessage({
             chat_id: chatId,
             text: question,
+						parse_mode: 'Markdown',
             reply_parameters: {
                 message_id: u.message.message_id,
                 chat_id: chatId,
@@ -49,6 +50,7 @@ async function handleAnswerCallBackQuery(u: Telegram.Update, client: APIClient) 
                 chat_id: u.callback_query.message.chat.id,
                 message_id: u.callback_query.message.message_id,
                 text: `Congratulations ${name}! You have been unbanned!`,
+								parse_mode: undefined,
                 reply_markup: {
                     inline_keyboard: [
                         [{
@@ -65,6 +67,7 @@ async function handleAnswerCallBackQuery(u: Telegram.Update, client: APIClient) 
                 chat_id: u.callback_query.message.chat.id,
                 message_id: u.callback_query.message.message_id,
                 text: question,
+								parse_mode: 'Markdown',
                 reply_markup: {
                     inline_keyboard: [buttons],
                 },
@@ -181,7 +184,7 @@ function isCorrectAnswer(callback_data: string): boolean {
 function generateQuestion(user: Telegram.User): { parse_mode?: Telegram.ParseMode; question: string; buttons: Telegram.InlineKeyboardButton[] } {
     const { operator, operands } = generateOperation();
     const answer = calculateOperation(operator, operands);
-    const question = `Answer the following question to be unbanned\n${operands[0]} ${operator} ${operands[1]} = ?`;
+    const question = `[Welcome](tg://user?id=${user.id}), Answer the following question to be unbanned\n${operands[0]} ${operator} ${operands[1]} = ?`;
     const buttons: Telegram.InlineKeyboardButton[] = [];
     let offsets = [1,2,3,4,5,-1,-2,-3,-4,-5]
 			.sort(() => Math.random() - 0.5)
