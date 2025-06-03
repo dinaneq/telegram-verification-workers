@@ -5,4 +5,4 @@ compatibility_date = "2024-08-21"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
-TELEGRAM_BOT_TOKEN = "REPLACE_ME"
+TELEGRAM_BOT_TOKEN = "8114502867:AAG2dTWoyYwr8e4Q5ph2TnAnqLGF54PWZ5U"
